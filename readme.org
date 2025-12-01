@@ -1,0 +1,269 @@
+#+AUTHOR: Tony
+#+STARTUP: overview
+
+* Table of Contents :toc:
+- [[#dwc--dwm-wayland-compositor][DWC — DWM Wayland Compositor]]
+- [[#installation][Installation]]
+  - [[#nixos-with-flakes][NixOS (with Flakes)]]
+  - [[#building-from-source][Building from Source]]
+  - [[#running-dwc][Running DWC]]
+- [[#current-status][Current Status]]
+- [[#key-bindings][Key Bindings]]
+- [[#features][Features]]
+- [[#development][Development]]
+  - [[#setting-up-the-development-environment][Setting Up the Development Environment]]
+  - [[#building][Building]]
+  - [[#testing-nested][Testing (Nested)]]
+  - [[#cleaning-build-artifacts][Cleaning Build Artifacts]]
+- [[#project-structure][Project Structure]]
+- [[#architecture-notes][Architecture Notes]]
+  - [[#why-c-over-zig][Why C over Zig?]]
+  - [[#modular-structure][Modular Structure]]
+  - [[#scene-graph-rendering][Scene Graph Rendering]]
+- [[#development-roadmap][Development Roadmap]]
+  - [[#current-focus][Current Focus]]
+  - [[#future-enhancements][Future Enhancements]]
+- [[#license][License]]
+
+* DWC — DWM Wayland Compositor
+A minimal Wayland compositor written in C, built on wlroots 0.19. DWC is the Wayland counterpart to OXWM, designed to be *simple, extensible, and hackable*. No configuration files, no bloat, no frameworks — just clean C code that does one thing well: compositing windows on Wayland.
+
+Currently in early development. Right now it's basically tinywl with a clean module structure, but the vision is to evolve it into a DWM-like tiling compositor with the same philosophy as OXWM.
+
+* Installation
+** NixOS (with Flakes)
+DWC includes a =flake.nix= for development. Clone the repo and build with:
+
+#+begin_src sh
+git clone https://github.com/tonybanters/dwc
+cd dwc
+nix develop -c zig build
+#+end_src
+
+Or build the package directly:
+
+#+begin_src sh
+nix build
+./result/bin/dwc
+#+end_src
+
+** Building from Source
+Install dependencies (zig 0.13+, wlroots 0.19, wayland, wayland-protocols, libxkbcommon, pixman):
+
+#+begin_src sh
+# Arch Linux
+sudo pacman -S zig wlroots wayland wayland-protocols libxkbcommon pixman
+
+# Debian/Ubuntu (you'll need wlroots 0.19 from source)
+sudo apt install libwayland-dev wayland-protocols libxkbcommon-dev libpixman-1-dev
+# Install Zig from https://ziglang.org/download/
+#+end_src
+
+Then build:
+#+begin_src sh
+git clone https://github.com/tonybanters/dwc
+cd dwc
+zig build
+#+end_src
+
+** Running DWC
+DWC runs nested in your existing compositor for development/testing:
+
+#+begin_src sh
+zig build run
+#+end_src
+
+Or run the binary directly:
+#+begin_src sh
+./zig-out/bin/dwc
+#+end_src
+
+To launch with a startup command (like a terminal):
+#+begin_src sh
+./zig-out/bin/dwc -s foot
+#+end_src
+
+For production use, you'd typically launch it from a TTY or display manager.
+
+* Current Status
+DWC is in *early development*. Here's what works:
+
+- ✅ Window creation and display
+- ✅ Keyboard input (Alt+Escape to quit, Alt+F1 to cycle windows)
+- ✅ Mouse input (click to focus, drag to move)
+- ✅ Multiple outputs
+- ✅ XDG shell protocol (popups, toplevels)
+- ✅ Interactive window move/resize
+
+What's *not* implemented yet:
+- ❌ Tiling layouts (currently floating only)
+- ❌ Workspace/tag system
+- ❌ Status bar
+- ❌ Configuration system
+- ❌ Keybinding customization
+- ❌ Window rules
+
+Think of current DWC as tinywl with better code organization. The real features are coming.
+
+* Key Bindings
+Current keybindings are hardcoded (for now):
+
+| Binding       | Action              |
+|---------------+---------------------|
+| Alt+Escape    | Quit compositor     |
+| Alt+F1        | Cycle windows       |
+| Mouse1        | Focus window        |
+| Alt+Mouse1    | Move window         |
+| Alt+Mouse2    | Resize window       |
+
+These will be configurable once we add a configuration system.
+
+* Features
+Current features (as of v0.1.0):
+
+- Minimal footprint (~110KB binary)
+- Clean modular C codebase
+- wlroots scene graph for rendering
+- Interactive window management
+- Multiple output support
+- XDG shell support (application windows + popups)
+
+* Development
+
+** Setting Up the Development Environment
+Using Nix (recommended):
+#+begin_src sh
+nix develop
+#+end_src
+
+This will drop you into a shell with all dependencies (zig, wlroots, wayland, etc.) available.
+
+** Building
+Build the compositor:
+#+begin_src sh
+zig build
+#+end_src
+
+Build with optimizations:
+#+begin_src sh
+zig build -Doptimize=ReleaseFast
+#+end_src
+
+** Testing (Nested)
+Test DWC in a nested compositor without switching your session:
+
+#+begin_src sh
+zig build run
+#+end_src
+
+This runs DWC inside your current Wayland compositor.
+
+To test with a different startup program:
+#+begin_src sh
+zig build run -- -s alacritty
+#+end_src
+
+** Cleaning Build Artifacts
+#+begin_src sh
+zig build clean
+#+end_src
+
+This removes =zig-out/=, =zig-cache/=, and =protocols/= directories.
+
+* Project Structure
+#+begin_src sh
+dwc/
+├── include/
+│   ├── types.h                 [All struct definitions - server, outputs, toplevels, etc.]
+│   └── dwc.h                   [Public API - function declarations for all modules]
+│
+├── src/
+│   ├── main.c                  [Entry point - arg parsing, calls server_init/run/cleanup]
+│   ├── server.c                [Server lifecycle - init, event loop, cleanup]
+│   │   ├── server_init()       [Initialize wlroots backend, renderer, allocator, scene]
+│   │   ├── server_run()        [Start backend, create socket, run event loop]
+│   │   └── server_cleanup()    [Clean up listeners, destroy wlroots objects]
+│   │
+│   ├── xdg_shell.c             [XDG shell protocol - toplevels and popups]
+│   │   ├── server_new_xdg_toplevel()   [Handle new application windows]
+│   │   ├── xdg_toplevel_map()          [Window mapping/visibility]
+│   │   ├── focus_toplevel()            [Focus management]
+│   │   └── desktop_toplevel_at()       [Hit testing for window under cursor]
+│   │
+│   ├── input.c                 [Input handling - keyboard, pointer, seat]
+│   │   ├── server_new_input()          [Device hotplug handling]
+│   │   ├── server_new_keyboard()       [Keyboard setup, XKB configuration]
+│   │   ├── handle_keybinding()         [Compositor keybindings]
+│   │   ├── process_cursor_motion()     [Cursor movement and focus]
+│   │   └── server_cursor_button()      [Mouse clicks]
+│   │
+│   ├── output.c                [Output/monitor management]
+│   │   ├── server_new_output()         [New monitor hotplug]
+│   │   ├── output_frame()              [Frame rendering with scene graph]
+│   │   └── output_request_state()      [Handle resolution/mode changes]
+│   │
+│   └── layout.c                [Interactive operations (will become tiling layout)]
+│       ├── begin_interactive()         [Start move/resize operation]
+│       ├── process_cursor_move()       [Update window position during drag]
+│       ├── process_cursor_resize()     [Update window size during resize]
+│       └── reset_cursor_mode()         [Exit interactive mode]
+│
+├── protocols/
+│   ├── xdg-shell-protocol.h    [Generated from wayland-protocols]
+│   └── xdg-shell-protocol.c    [XDG shell implementation]
+│
+├── build.zig                   [Zig build system with protocol generation]
+└── flake.nix                   [Nix flake for development environment and package]
+#+end_src
+
+* Architecture Notes
+** Why C over Zig?
+DWC was originally started in Zig (see =zwc= repo) but hit FFI/ABI issues with wlroots callback function pointers. The Zig @cImport system doesn't play nice with wlroots 0.19's callback heavy design. After two weeks of fighting with it, I pivoted to C.
+
+C is the *right tool* for wlroots compositors:
+- Zero FFI layer — direct wlroots API access
+- All examples and documentation use C
+- No build system complexity
+- Simple, predictable, debuggable
+
+The syntax isn't as nice, but it works. And that's what matters.
+
+** Modular Structure
+DWC uses a *flat but modular* structure inspired by OXWM. Each module is a focused .c file with a clear purpose:
+
+- =server.c= - Lifecycle management
+- =xdg_shell.c= - Window management
+- =input.c= - Input devices
+- =output.c= - Display management
+- =layout.c= - Window arrangement (currently interactive ops, will become tiling)
+
+No header file for every .c file. Use =static= liberally. Only expose what's needed in =dwc.h=.
+
+** Scene Graph Rendering
+DWC uses wlroots' scene graph API instead of manual rendering. Benefits:
+- Automatic damage tracking
+- Efficient repaints (only what changed)
+- Compositor just adds nodes to the scene tree
+- wlroots handles all the rendering complexity
+
+This is the modern wlroots approach (0.17+). Old compositors manually tracked damage and rendered surfaces.
+
+* Development Roadmap
+** Current Focus
+- [ ] Tiling layout implementation (master/stack like DWM)
+- [ ] Tag/workspace system
+- [ ] Keybinding configuration
+- [ ] Status bar (similar to OXWM's bar system)
+
+** Future Enhancements
+- [ ] Configuration file (probably not Lua — maybe C header)
+- [ ] Window rules (auto-tag, floating)
+- [ ] Multi-monitor improvements
+- [ ] Gaps support
+- [ ] Scratchpad
+- [ ] External bar protocol support
+
+The goal is to make DWC the Wayland equivalent of OXWM — clean, tiling, tag-based, minimal but powerful.
+
+* License
+[[https://www.gnu.org/licenses/gpl-3.0.en.html][GPL v3]]
