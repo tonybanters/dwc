@@ -14,8 +14,7 @@ void focus_toplevel(struct dwc_toplevel *toplevel) {
 		return;
 	}
 	if (previous_surface) {
-		struct wlr_xdg_toplevel *previous_toplevel =
-			wlr_xdg_toplevel_try_from_wlr_surface(previous_surface);
+		struct wlr_xdg_toplevel *previous_toplevel = wlr_xdg_toplevel_try_from_wlr_surface(previous_surface);
 		if (previous_toplevel != NULL) {
 			wlr_xdg_toplevel_set_activated(previous_toplevel, false);
 		}
@@ -26,22 +25,36 @@ void focus_toplevel(struct dwc_toplevel *toplevel) {
 	wl_list_insert(&server->toplevels, &toplevel->link);
 	wlr_xdg_toplevel_set_activated(toplevel->xdg_toplevel, true);
 	if (keyboard != NULL) {
-		wlr_seat_keyboard_notify_enter(seat, surface,
-			keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
+		wlr_seat_keyboard_notify_enter(
+            seat,
+            surface,
+            keyboard->keycodes,
+            keyboard->num_keycodes,
+            &keyboard->modifiers
+        );
 	}
 }
 
-struct dwc_toplevel *desktop_toplevel_at(struct dwc_server *server,
-		double layout_x, double layout_y, struct wlr_surface **surface,
-		double *surface_x, double *surface_y) {
-	struct wlr_scene_node *node = wlr_scene_node_at(
-		&server->scene->tree.node, layout_x, layout_y, surface_x, surface_y);
+struct dwc_toplevel *desktop_toplevel_at(
+        struct dwc_server *server,
+        double layout_x,
+        double layout_y,
+        struct wlr_surface **surface,
+        double *surface_x,
+        double *surface_y
+    ) { 
+    struct wlr_scene_node *node = wlr_scene_node_at(
+        &server->scene->tree.node,
+        layout_x,
+        layout_y,
+        surface_x,
+        surface_y
+    );
 	if (node == NULL || node->type != WLR_SCENE_NODE_BUFFER) {
 		return NULL;
 	}
 	struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
-	struct wlr_scene_surface *scene_surface =
-		wlr_scene_surface_try_from_buffer(scene_buffer);
+	struct wlr_scene_surface *scene_surface = wlr_scene_surface_try_from_buffer(scene_buffer);
 	if (!scene_surface) {
 		return NULL;
 	}
@@ -56,9 +69,7 @@ struct dwc_toplevel *desktop_toplevel_at(struct dwc_server *server,
 
 void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 	struct dwc_toplevel *toplevel = wl_container_of(listener, toplevel, map);
-
 	wl_list_insert(&toplevel->server->toplevels, &toplevel->link);
-
 	focus_toplevel(toplevel);
 }
 
@@ -107,16 +118,14 @@ void xdg_toplevel_request_resize(struct wl_listener *listener, void *data) {
 }
 
 void xdg_toplevel_request_maximize(struct wl_listener *listener, void *data) {
-	struct dwc_toplevel *toplevel =
-		wl_container_of(listener, toplevel, request_maximize);
+	struct dwc_toplevel *toplevel = wl_container_of(listener, toplevel, request_maximize);
 	if (toplevel->xdg_toplevel->base->initialized) {
 		wlr_xdg_surface_schedule_configure(toplevel->xdg_toplevel->base);
 	}
 }
 
 void xdg_toplevel_request_fullscreen(struct wl_listener *listener, void *data) {
-	struct dwc_toplevel *toplevel =
-		wl_container_of(listener, toplevel, request_fullscreen);
+	struct dwc_toplevel *toplevel = wl_container_of(listener, toplevel, request_fullscreen);
 	if (toplevel->xdg_toplevel->base->initialized) {
 		wlr_xdg_surface_schedule_configure(toplevel->xdg_toplevel->base);
 	}
@@ -129,8 +138,7 @@ void server_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 	struct dwc_toplevel *toplevel = calloc(1, sizeof(*toplevel));
 	toplevel->server = server;
 	toplevel->xdg_toplevel = xdg_toplevel;
-	toplevel->scene_tree =
-		wlr_scene_xdg_surface_create(&toplevel->server->scene->tree, xdg_toplevel->base);
+	toplevel->scene_tree = wlr_scene_xdg_surface_create(&toplevel->server->scene->tree, xdg_toplevel->base);
 	toplevel->scene_tree->node.data = toplevel;
 	xdg_toplevel->base->data = toplevel->scene_tree;
 

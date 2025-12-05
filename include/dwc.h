@@ -47,9 +47,14 @@ void xdg_popup_commit(struct wl_listener *listener, void *data);
 void xdg_popup_destroy(struct wl_listener *listener, void *data);
 
 void focus_toplevel(struct dwc_toplevel *toplevel);
-struct dwc_toplevel *desktop_toplevel_at(struct dwc_server *server,
-	double layout_x, double layout_y, struct wlr_surface **surface,
-	double *surface_x, double *surface_y);
+struct dwc_toplevel *desktop_toplevel_at(
+    struct dwc_server *server,
+    double layout_x,
+    double layout_y,
+    struct wlr_surface **surface,
+    double *surface_x,
+    double *surface_y
+);
 
 void begin_interactive(struct dwc_toplevel *toplevel, enum dwc_cursor_mode mode, uint32_t edges);
 void reset_cursor_mode(struct dwc_server *server);

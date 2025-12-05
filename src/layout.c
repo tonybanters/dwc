@@ -8,9 +8,11 @@ void reset_cursor_mode(struct dwc_server *server) {
 
 void process_cursor_move(struct dwc_server *server) {
 	struct dwc_toplevel *toplevel = server->grabbed_toplevel;
-	wlr_scene_node_set_position(&toplevel->scene_tree->node,
-		server->cursor->x - server->grab_x,
-		server->cursor->y - server->grab_y);
+	wlr_scene_node_set_position(
+        &toplevel->scene_tree->node,
+        server->cursor->x - server->grab_x,
+        server->cursor->y - server->grab_y
+    );
 }
 
 void process_cursor_resize(struct dwc_server *server) {
@@ -46,16 +48,18 @@ void process_cursor_resize(struct dwc_server *server) {
 	}
 
 	struct wlr_box *geometry_box = &toplevel->xdg_toplevel->base->geometry;
-	wlr_scene_node_set_position(&toplevel->scene_tree->node,
-		new_left - geometry_box->x, new_top - geometry_box->y);
+	wlr_scene_node_set_position(
+        &toplevel->scene_tree->node,
+        new_left - geometry_box->x,
+        new_top - geometry_box->y
+    );
 
 	int new_width = new_right - new_left;
 	int new_height = new_bottom - new_top;
 	wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, new_width, new_height);
 }
 
-void begin_interactive(struct dwc_toplevel *toplevel,
-		enum dwc_cursor_mode mode, uint32_t edges) {
+void begin_interactive(struct dwc_toplevel *toplevel, enum dwc_cursor_mode mode, uint32_t edges) {
 	struct dwc_server *server = toplevel->server;
 
 	server->grabbed_toplevel = toplevel;

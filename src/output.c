@@ -6,8 +6,7 @@ void output_frame(struct wl_listener *listener, void *data) {
 	struct dwc_output *output = wl_container_of(listener, output, frame);
 	struct wlr_scene *scene = output->server->scene;
 
-	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(
-		scene, output->wlr_output);
+	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(scene, output->wlr_output);
 
 	wlr_scene_output_commit(scene_output, NULL);
 
@@ -33,8 +32,7 @@ void output_destroy(struct wl_listener *listener, void *data) {
 }
 
 void server_new_output(struct wl_listener *listener, void *data) {
-	struct dwc_server *server =
-		wl_container_of(listener, server, new_output);
+	struct dwc_server *server = wl_container_of(listener, server, new_output);
 	struct wlr_output *wlr_output = data;
 
 	wlr_output_init_render(wlr_output, server->allocator, server->renderer);
@@ -66,8 +64,7 @@ void server_new_output(struct wl_listener *listener, void *data) {
 
 	wl_list_insert(&server->outputs, &output->link);
 
-	struct wlr_output_layout_output *layout_output = wlr_output_layout_add_auto(server->output_layout,
-		wlr_output);
+	struct wlr_output_layout_output *layout_output = wlr_output_layout_add_auto(server->output_layout, wlr_output);
 	struct wlr_scene_output *scene_output = wlr_scene_output_create(server->scene, wlr_output);
 	wlr_scene_output_layout_add_output(server->scene_layout, layout_output, scene_output);
 }

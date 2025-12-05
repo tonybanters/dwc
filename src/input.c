@@ -1,29 +1,40 @@
 #include "dwc.h"
 #include <stdlib.h>
+#include <unistd.h>
 #include <wlr/types/wlr_data_device.h>
 #include <wlr/types/wlr_input_device.h>
 #include <wlr/types/wlr_pointer.h>
 #include <xkbcommon/xkbcommon.h>
 
 void keyboard_handle_modifiers(struct wl_listener *listener, void *data) {
-	struct dwc_keyboard *keyboard =
-		wl_container_of(listener, keyboard, modifiers);
+	struct dwc_keyboard *keyboard = wl_container_of(listener, keyboard, modifiers);
 	wlr_seat_set_keyboard(keyboard->server->seat, keyboard->wlr_keyboard);
-	wlr_seat_keyboard_notify_modifiers(keyboard->server->seat,
-		&keyboard->wlr_keyboard->modifiers);
+	wlr_seat_keyboard_notify_modifiers(keyboard->server->seat, &keyboard->wlr_keyboard->modifiers);
 }
 
-bool handle_keybinding(struct dwc_server *server, xkb_keysym_t sym) {
-	switch (sym) {
+bool handle_keybinding(struct dwc_server *server, xkb_keysym_t keysym) {
+	switch (keysym) {
 	case XKB_KEY_Escape:
 		wl_display_terminate(server->wl_display);
+		break;
+	case XKB_KEY_Return:
+		if (fork() == 0) {
+			execl("/bin/sh", "/bin/sh", "-c", "foot", NULL);
+			_exit(1);
+		}
+		break;
+	case XKB_KEY_q:
+		if (!wl_list_empty(&server->toplevels)) {
+			struct dwc_toplevel *toplevel =
+				wl_container_of(server->toplevels.next, toplevel, link);
+			wlr_xdg_toplevel_send_close(toplevel->xdg_toplevel);
+		}
 		break;
 	case XKB_KEY_F1:
 		if (wl_list_length(&server->toplevels) < 2) {
 			break;
 		}
-		struct dwc_toplevel *next_toplevel =
-			wl_container_of(server->toplevels.prev, next_toplevel, link);
+		struct dwc_toplevel *next_toplevel = wl_container_of(server->toplevels.prev, next_toplevel, link);
 		focus_toplevel(next_toplevel);
 		break;
 	default:
@@ -33,21 +44,18 @@ bool handle_keybinding(struct dwc_server *server, xkb_keysym_t sym) {
 }
 
 void keyboard_handle_key(struct wl_listener *listener, void *data) {
-	struct dwc_keyboard *keyboard =
-		wl_container_of(listener, keyboard, key);
+	struct dwc_keyboard *keyboard = wl_container_of(listener, keyboard, key);
 	struct dwc_server *server = keyboard->server;
 	struct wlr_keyboard_key_event *event = data;
 	struct wlr_seat *seat = server->seat;
 
 	uint32_t keycode = event->keycode + 8;
 	const xkb_keysym_t *syms;
-	int nsyms = xkb_state_key_get_syms(
-			keyboard->wlr_keyboard->xkb_state, keycode, &syms);
+	int nsyms = xkb_state_key_get_syms(keyboard->wlr_keyboard->xkb_state, keycode, &syms);
 
 	bool handled = false;
 	uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->wlr_keyboard);
-	if ((modifiers & WLR_MODIFIER_ALT) &&
-			event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
+	if ((modifiers & WLR_MODIFIER_ALT) && event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
 		for (int i = 0; i < nsyms; i++) {
 			handled = handle_keybinding(server, syms[i]);
 		}
@@ -55,14 +63,12 @@ void keyboard_handle_key(struct wl_listener *listener, void *data) {
 
 	if (!handled) {
 		wlr_seat_set_keyboard(seat, keyboard->wlr_keyboard);
-		wlr_seat_keyboard_notify_key(seat, event->time_msec,
-			event->keycode, event->state);
+		wlr_seat_keyboard_notify_key(seat, event->time_msec, event->keycode, event->state);
 	}
 }
 
 void keyboard_handle_destroy(struct wl_listener *listener, void *data) {
-	struct dwc_keyboard *keyboard =
-		wl_container_of(listener, keyboard, destroy);
+	struct dwc_keyboard *keyboard = wl_container_of(listener, keyboard, destroy);
 	wl_list_remove(&keyboard->modifiers.link);
 	wl_list_remove(&keyboard->key.link);
 	wl_list_remove(&keyboard->destroy.link);
@@ -70,8 +76,7 @@ void keyboard_handle_destroy(struct wl_listener *listener, void *data) {
 	free(keyboard);
 }
 
-void server_new_keyboard(struct dwc_server *server,
-		struct wlr_input_device *device) {
+void server_new_keyboard(struct dwc_server *server, struct wlr_input_device *device) {
 	struct wlr_keyboard *wlr_keyboard = wlr_keyboard_from_input_device(device);
 
 	struct dwc_keyboard *keyboard = calloc(1, sizeof(*keyboard));
@@ -79,8 +84,7 @@ void server_new_keyboard(struct dwc_server *server,
 	keyboard->wlr_keyboard = wlr_keyboard;
 
 	struct xkb_context *context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-	struct xkb_keymap *keymap = xkb_keymap_new_from_names(context, NULL,
-		XKB_KEYMAP_COMPILE_NO_FLAGS);
+	struct xkb_keymap *keymap = xkb_keymap_new_from_names(context, NULL, XKB_KEYMAP_COMPILE_NO_FLAGS);
 
 	wlr_keyboard_set_keymap(wlr_keyboard, keymap);
 	xkb_keymap_unref(keymap);
@@ -99,14 +103,12 @@ void server_new_keyboard(struct dwc_server *server,
 	wl_list_insert(&server->keyboards, &keyboard->link);
 }
 
-void server_new_pointer(struct dwc_server *server,
-		struct wlr_input_device *device) {
+void server_new_pointer(struct dwc_server *server, struct wlr_input_device *device) {
 	wlr_cursor_attach_input_device(server->cursor, device);
 }
 
 void server_new_input(struct wl_listener *listener, void *data) {
-	struct dwc_server *server =
-		wl_container_of(listener, server, new_input);
+	struct dwc_server *server = wl_container_of(listener, server, new_input);
 	struct wlr_input_device *device = data;
 	switch (device->type) {
 	case WLR_INPUT_DEVICE_KEYBOARD:
@@ -126,20 +128,16 @@ void server_new_input(struct wl_listener *listener, void *data) {
 }
 
 void seat_request_cursor(struct wl_listener *listener, void *data) {
-	struct dwc_server *server = wl_container_of(
-			listener, server, request_cursor);
+	struct dwc_server *server = wl_container_of(listener, server, request_cursor);
 	struct wlr_seat_pointer_request_set_cursor_event *event = data;
-	struct wlr_seat_client *focused_client =
-		server->seat->pointer_state.focused_client;
+	struct wlr_seat_client *focused_client = server->seat->pointer_state.focused_client;
 	if (focused_client == event->seat_client) {
-		wlr_cursor_set_surface(server->cursor, event->surface,
-				event->hotspot_x, event->hotspot_y);
+		wlr_cursor_set_surface(server->cursor, event->surface, event->hotspot_x, event->hotspot_y);
 	}
 }
 
 void seat_pointer_focus_change(struct wl_listener *listener, void *data) {
-	struct dwc_server *server = wl_container_of(
-			listener, server, pointer_focus_change);
+	struct dwc_server *server = wl_container_of(listener, server, pointer_focus_change);
 	struct wlr_seat_pointer_focus_change_event *event = data;
 	if (event->new_surface == NULL) {
 		wlr_cursor_set_xcursor(server->cursor, server->cursor_manager, "default");
@@ -147,8 +145,7 @@ void seat_pointer_focus_change(struct wl_listener *listener, void *data) {
 }
 
 void seat_request_set_selection(struct wl_listener *listener, void *data) {
-	struct dwc_server *server = wl_container_of(
-			listener, server, request_set_selection);
+	struct dwc_server *server = wl_container_of(listener, server, request_set_selection);
 	struct wlr_seat_request_set_selection_event *event = data;
 	wlr_seat_set_selection(server->seat, event->source, event->serial);
 }
@@ -165,8 +162,14 @@ void process_cursor_motion(struct dwc_server *server, uint32_t time) {
 	double surface_x, surface_y;
 	struct wlr_seat *seat = server->seat;
 	struct wlr_surface *surface = NULL;
-	struct dwc_toplevel *toplevel = desktop_toplevel_at(server,
-			server->cursor->x, server->cursor->y, &surface, &surface_x, &surface_y);
+	struct dwc_toplevel *toplevel = desktop_toplevel_at(
+        server,
+        server->cursor->x,
+        server->cursor->y,
+        &surface,
+        &surface_x,
+        &surface_y
+    );
 	if (!toplevel) {
 		wlr_cursor_set_xcursor(server->cursor, server->cursor_manager, "default");
 	}
@@ -179,51 +182,55 @@ void process_cursor_motion(struct dwc_server *server, uint32_t time) {
 }
 
 void server_cursor_motion(struct wl_listener *listener, void *data) {
-	struct dwc_server *server =
-		wl_container_of(listener, server, cursor_motion);
+	struct dwc_server *server = wl_container_of(listener, server, cursor_motion);
 	struct wlr_pointer_motion_event *event = data;
-	wlr_cursor_move(server->cursor, &event->pointer->base,
-			event->delta_x, event->delta_y);
+	wlr_cursor_move(server->cursor, &event->pointer->base, event->delta_x, event->delta_y);
 	process_cursor_motion(server, event->time_msec);
 }
 
 void server_cursor_motion_absolute(struct wl_listener *listener, void *data) {
-	struct dwc_server *server =
-		wl_container_of(listener, server, cursor_motion_absolute);
+	struct dwc_server *server = wl_container_of(listener, server, cursor_motion_absolute);
 	struct wlr_pointer_motion_absolute_event *event = data;
-	wlr_cursor_warp_absolute(server->cursor, &event->pointer->base, event->x,
-		event->y);
+	wlr_cursor_warp_absolute(server->cursor, &event->pointer->base, event->x, event->y);
 	process_cursor_motion(server, event->time_msec);
 }
 
 void server_cursor_button(struct wl_listener *listener, void *data) {
-	struct dwc_server *server =
-		wl_container_of(listener, server, cursor_button);
+	struct dwc_server *server = wl_container_of(listener, server, cursor_button);
 	struct wlr_pointer_button_event *event = data;
-	wlr_seat_pointer_notify_button(server->seat,
-			event->time_msec, event->button, event->state);
+	wlr_seat_pointer_notify_button(server->seat, event->time_msec, event->button, event->state);
 	if (event->state == WL_POINTER_BUTTON_STATE_RELEASED) {
 		reset_cursor_mode(server);
 	} else {
 		double surface_x, surface_y;
 		struct wlr_surface *surface = NULL;
-		struct dwc_toplevel *toplevel = desktop_toplevel_at(server,
-				server->cursor->x, server->cursor->y, &surface, &surface_x, &surface_y);
+		struct dwc_toplevel *toplevel = desktop_toplevel_at(
+            server,
+            server->cursor->x,
+            server->cursor->y,
+            &surface,
+            &surface_x,
+            &surface_y
+        );
 		focus_toplevel(toplevel);
 	}
 }
 
 void server_cursor_axis(struct wl_listener *listener, void *data) {
-	struct dwc_server *server =
-		wl_container_of(listener, server, cursor_axis);
+	struct dwc_server *server = wl_container_of(listener, server, cursor_axis);
 	struct wlr_pointer_axis_event *event = data;
-	wlr_seat_pointer_notify_axis(server->seat,
-			event->time_msec, event->orientation, event->delta,
-			event->delta_discrete, event->source, event->relative_direction);
+	wlr_seat_pointer_notify_axis(
+        server->seat,
+        event->time_msec,
+        event->orientation,
+        event->delta,
+        event->delta_discrete,
+        event->source,
+        event->relative_direction
+    ); 
 }
 
 void server_cursor_frame(struct wl_listener *listener, void *data) {
-	struct dwc_server *server =
-		wl_container_of(listener, server, cursor_frame);
+	struct dwc_server *server = wl_container_of(listener, server, cursor_frame);
 	wlr_seat_pointer_notify_frame(server->seat);
 }
